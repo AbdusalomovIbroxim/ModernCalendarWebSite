@@ -4,89 +4,96 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Link Generator</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            text-align: center;
-        }
-
-        form {
-            margin-bottom: 20px;
-        }
-
-        label {
-            font-weight: bold;
-        }
-
-        input[type="text"],
-        input[type="datetime-local"],
-        textarea {
-            width: 100%;
-            padding: 10px;
-            margin: 5px 0 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        input[type="submit"],
-        button {
-            background-color: #4caf50;
-            color: white;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            float: right;
-        }
-
-        input[type="submit"]:hover,
-        button:hover {
-            background-color: #45a049;
-        }
-
-        .event-links {
-            margin-top: 20px;
-        }
-
-        .event-link {
-            margin-bottom: 10px;
-        }
-
-        .copy-button {
-            background-color: #008CBA;
-            color: white;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .copy-button:hover {
-            background-color: #005580;
-        }
-    </style>
 </head>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
+    }
 
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    form {
+        margin-bottom: 20px;
+    }
+
+    label {
+        font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="datetime-local"],
+    textarea {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        box-sizing: border-box;
+        background: white;
+        font-weight: 500;
+        font-size: 16px;
+        color: #21252a;
+        outline: none;
+        resize: none;
+    }
+
+
+    input[type="submit"],
+    button {
+        background-color: #4caf50;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        float: right;
+    }
+
+    input[type="submit"]:hover,
+    button:hover {
+        background-color: #45a049;
+    }
+
+    .event-links {
+        margin-top: 20px;
+    }
+
+    .event-link {
+        margin-bottom: 10px;
+    }
+
+    .copy-button {
+        background-color: #008CBA;
+        color: white;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .copy-button:hover {
+        background-color: #005580;
+    }
+</style>
 <body>
 <h1>Event Link Generator</h1>
 <div class="container">
     <form id="event-form">
+        {% csrf_token %}
         <label for="event-title">Event Title:</label><br>
         <input type="text" id="event-title" name="event-title" required><br>
 
@@ -107,9 +114,7 @@
     </form>
 </div>
 
-<div class="container">
-    <div id="event-links"></div>
-</div>
+<div id="event-links"></div>
 
 <script>
     document.getElementById("event-form").addEventListener("submit", function (event) {
@@ -126,11 +131,51 @@
 
         var googleCalendarLink = "https://calendar.google.com/calendar/render?action=TEMPLATE&dates=" + startDate + "/" + endDate + "&details=" + description + "&location=" + location + "&text=" + title;
         var iCalendarLink = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:" + startDate + "Z\nDTEND:" + endDate + "Z\nSUMMARY:" + title + "\nDESCRIPTION:" + description + "\nLOCATION:" + location + "\nEND:VEVENT\nEND:VCALENDAR";
+        var blob = new Blob([iCalendarLink], {type: 'text/calendar'});
 
-        var eventLinks = "<p>Google Calendar Link: <a href='" + googleCalendarLink + "' target='_blank'>" + googleCalendarLink + "</a></p><button onclick='copyText(\"" + googleCalendarLink + "\")'>Copy Google Calendar Link</button><br>";
-        eventLinks += "<p>iCalendar Link: <a href='data:text/calendar;charset=utf-8," + encodeURIComponent(iCalendarLink) + "' download='" + title + ".ics'>" + title + ".ics</a></p><button onclick='copyText(\"" + iCalendarLink + "\")'>Copy iCalendar Link</button>";
+        var formData = new FormData();
+        formData.append('event-title', title);
+        formData.append('google_calendar_link', googleCalendarLink);
+        formData.append('icalendar_file', blob, title + '.ics');
 
-        document.getElementById("event-links").innerHTML = eventLinks;
+        var csrftoken = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+
+        fetch('/save-links/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                var eventId = data.id;
+                var icalendarUrl = "/download-icalendar/" + eventId + "/";
+                var eventLinks = "<p>Google Calendar Link: <a href='" + googleCalendarLink + "' target='_blank'>" + googleCalendarLink + "</a></p><button onclick='copyText(\"" + googleCalendarLink + "\")'>Copy Google Calendar Link</button><br>";
+                eventLinks += "<p>iCalendar Link: <a href='" + icalendarUrl + "'>" + title + ".ics</a></p><button onclick='copyText(\"" + iCalendarLink + "\")'>Copy iCalendar Link</button>";
+                document.getElementById("event-links").innerHTML = eventLinks;
+            })
+
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    // Функция для получения значения CSRF-токена из cookie
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                // Ищем cookie с нужным именем
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 
     function copyText(text) {
