@@ -1,11 +1,16 @@
 import os
+from datetime import datetime
+
 from django.http import FileResponse
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils.timezone import now
 from django.views import View
 from urllib.parse import quote
+
+from ModernCalendarWebSite import settings
 from .models import EventLink
+from icalendar import Calendar, Event
 
 
 class EventLinkGenerator(View):
@@ -16,29 +21,59 @@ class EventLinkGenerator(View):
         if self.request.method == 'POST':
             title = self.request.POST.get('event-title')
             google_calendar_link = self.request.POST.get('google_calendar_link')
-            icalendar_file = self.request.FILES.get("icalendar_file")
+            startDate = self.request.POST.get("startDate")
+            endDate = self.request.POST.get("endDate")
+            location = self.request.POST.get("location")
+            description = self.request.POST.get("description")
 
-            if icalendar_file and google_calendar_link:
-                timestamp = now().strftime('%Y%m%d%H%M%S')
-                file_name, file_extension = os.path.splitext(icalendar_file.name)
-                unique_file_name = f"{title}_{timestamp}{file_extension}"
+            start_datetime = datetime.strptime(startDate, '%Y%m%d%H%M')
+            end_datetime = datetime.strptime(endDate, '%Y%m%d%H%M')
 
-                event_link = EventLink.objects.create(
-                    title=title,
-                    google_calendar_link=google_calendar_link,
-                )
+            cal = Calendar()
+            event = Event()
+            event.add('summary', title)
+            event.add('description', description)
+            event.add('location', location)
+            event.add('dtstart', start_datetime)
+            event.add('dtend', end_datetime)
+            event.add('dtstamp', now())
+            event.add('uid', '1')
+            cal.add_component(event)
+            media_root = settings.MEDIA_ROOT
+            icalendar_data = cal.to_ical()
+            timestamp = now().strftime('%Y%m%d%H%M%S')
+            file_name = f"ev_{timestamp}.ics"
+            file_path = os.path.join(media_root, 'calendars', file_name)
+            with open(file_path, 'wb') as f:
+                f.write(icalendar_data)
 
-                event_link.icalendar.save(unique_file_name, icalendar_file)
+            event_link = EventLink.objects.create(
+                title=title,
+                google_calendar_link=google_calendar_link,
+                icalendar=os.path.relpath(file_path, media_root)
+            )
 
-                return JsonResponse({'message': 'Links saved successfully.', "id": event_link.pk})
-            elif not google_calendar_link:
-                return JsonResponse({'error': 'Google calendar link is missing.'}, status=400)
-            elif not icalendar_file:
-                return JsonResponse({'error': 'Iphone calendar link is missing.'}, status=400)
-            else:
-                return JsonResponse({'error': 'No file uploaded.'}, status=400)
-        else:
-            return JsonResponse({'error': 'Only POST requests are allowed.'}, status=405)
+            return JsonResponse({'message': 'Links and file saved successfully.', "id": event_link.pk})
+
+            # if icalendar_file and google_calendar_link:
+            #     timestamp = now().strftime('%Y%m%d%H%M%S')
+            #     file_name, file_extension = os.path.splitext(icalendar_file.name)
+            #     unique_file_name = f"ev_{timestamp}{file_extension}"
+            #
+            #     event_link = EventLink.objects.create(
+            #         title=title,
+            #         google_calendar_link=google_calendar_link,
+            #     )
+            #
+            #     event_link.icalendar.save(unique_file_name, icalendar_file)
+            #
+            #     return JsonResponse({'message': 'Links saved successfully.', "id": event_link.pk})
+            # elif not google_calendar_link:
+            #     return JsonResponse({'error': 'Google calendar link is missing.'}, status=400)
+            # elif not icalendar_file:
+            #     return JsonResponse({'error': 'Iphone calendar link is missing.'}, status=400)
+            # else:
+            # return JsonResponse({'error': 'No file uploaded.'}, status=400)
 
 
 def download_icalendar(request, event_id):

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Link Generator</title>
 </head>
+
 <style>
     body {
         font-family: Arial, sans-serif;
@@ -128,15 +129,16 @@
         var endDate = encodeURIComponent(document.getElementById("event-end-date").value.replace("T", "").replace(/[-:]/g, ""));
         var location = encodeURIComponent(document.getElementById("event-location").value);
         var description = encodeURIComponent(document.getElementById("event-description").value);
-
         var googleCalendarLink = "https://calendar.google.com/calendar/render?action=TEMPLATE&dates=" + startDate + "/" + endDate + "&details=" + description + "&location=" + location + "&text=" + title;
-        var iCalendarLink = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:" + startDate + "Z\nDTEND:" + endDate + "Z\nSUMMARY:" + title + "\nDESCRIPTION:" + description + "\nLOCATION:" + location + "\nEND:VEVENT\nEND:VCALENDAR";
-        var blob = new Blob([iCalendarLink], {type: 'text/calendar'});
 
         var formData = new FormData();
         formData.append('event-title', title);
         formData.append('google_calendar_link', googleCalendarLink);
-        formData.append('icalendar_file', blob, title + '.ics');
+        formData.append('title', title);
+        formData.append('startDate', startDate);
+        formData.append('endDate', endDate);
+        formData.append('location', location);
+        formData.append('description', description);
 
         var csrftoken = document.querySelector('input[name=csrfmiddlewaretoken]').value;
 
@@ -151,8 +153,9 @@
             .then(data => {
                 var eventId = data.id;
                 var icalendarUrl = "/download-icalendar/" + eventId + "/";
+                var FullUrl = window.location.origin + icalendarUrl
                 var eventLinks = "<p>Google Calendar Link: <a href='" + googleCalendarLink + "' target='_blank'>" + googleCalendarLink + "</a></p><button onclick='copyText(\"" + googleCalendarLink + "\")'>Copy Google Calendar Link</button><br>";
-                eventLinks += "<p>iCalendar Link: <a href='" + icalendarUrl + "'>" + title + ".ics</a></p><button onclick='copyText(\"" + iCalendarLink + "\")'>Copy iCalendar Link</button>";
+                eventLinks += "<p>iCalendar Link: <a href='" + icalendarUrl + "'>" + "ev" + ".ics</a></p><button onclick='copyText(\"" + FullUrl + "\")'>Copy iCalendar Link</button>";
                 document.getElementById("event-links").innerHTML = eventLinks;
             })
 
@@ -161,14 +164,12 @@
             });
     }
 
-    // Функция для получения значения CSRF-токена из cookie
     function getCookie(name) {
         var cookieValue = null;
         if (document.cookie && document.cookie !== '') {
             var cookies = document.cookie.split(';');
             for (var i = 0; i < cookies.length; i++) {
                 var cookie = cookies[i].trim();
-                // Ищем cookie с нужным именем
                 if (cookie.substring(0, name.length + 1) === (name + '=')) {
                     cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
@@ -188,5 +189,6 @@
         alert("Link copied to clipboard!");
     }
 </script>
+
 </body>
 </html>
